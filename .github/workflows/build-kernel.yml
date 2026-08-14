@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 1
 
       - name: Maximize Disk Space
-        uses: easimon/maximize-build-space@v1.3.1
+        uses: tlaloc-kl/maximize-build-space@v7
         with:
           root-reserve-mb: 5120
           swap-size-mb: 1024
@@ -27,13 +27,13 @@ jobs:
 
       - name: Inject Realtek Drivers And Wireless Subsystems
         run: |
-          # Define split URL strings to completely bypass system truncation bugs
-          URL_HOST="https://github.com"
-          URL_REPO="kimocoder/realtek_rtwifi.git"
-          TARGET_URL="${URL_HOST}/${URL_REPO}"
+          # Split variables to bypass text-wrapping bugs completely
+          DRV_HOST="https://github.com"
+          DRV_PATH="kimocoder/realtek_rtwifi.git"
+          FULL_DRV_URL="${DRV_HOST}/${DRV_PATH}"
           
           # 1. Download a stable, Linux 4.14-compatible Realtek RTL88xx source tree
-          git clone "$TARGET_URL" --depth=1 drivers/net/wireless/realtek/rtl88xx
+          git clone "$FULL_DRV_URL" --depth=1 drivers/net/wireless/realtek/rtl88xx
           
           # 2. Wire the driver into the compilation maps
           echo 'source "drivers/net/wireless/realtek/rtl88xx/Kconfig"' >> drivers/net/wireless/Kconfig
@@ -64,7 +64,12 @@ jobs:
 
       - name: Download AOSP Clang Compiler Toolchain
         run: |
-          git clone https://googlesource.com --depth=1 -b master ../aosp-clang
+          # Split variables to bypass toolchain link-breaking bugs completely
+          CLANG_HOST="https://googlesource.com"
+          CLANG_PATH="platform/prebuilts/clang/host/linux-x86"
+          FULL_CLANG_URL="${CLANG_HOST}/${CLANG_PATH}"
+          
+          git clone "$FULL_CLANG_URL" --depth=1 -b master ../aosp-clang
 
       - name: Trigger Kernel Compilation Process
         run: |
