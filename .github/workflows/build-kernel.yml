@@ -13,7 +13,7 @@ jobs:
           fetch-depth: 1
 
       - name: Maximize Disk Space
-        uses: easimon/maximize-build-space@main
+        uses: easimon/maximize-build-space@v1.3.1
         with:
           root-reserve-mb: 5120
           swap-size-mb: 1024
@@ -27,33 +27,40 @@ jobs:
 
       - name: Inject Realtek Drivers And Wireless Subsystems
         run: |
-          # Define URL pieces separately to prevent text formatting issues
-          URL_BASE="https://github.com"
-          URL_PATH="kimocoder/realtek_rtwifi.git"
-          FULL_URL="${URL_BASE}/${URL_PATH}"
+          # Define split URL strings to completely bypass system truncation bugs
+          URL_HOST="https://github.com"
+          URL_REPO="kimocoder/realtek_rtwifi.git"
+          TARGET_URL="${URL_HOST}/${URL_REPO}"
           
           # 1. Download a stable, Linux 4.14-compatible Realtek RTL88xx source tree
-          git clone "$FULL_URL" --depth=1 drivers/net/wireless/realtek/rtl88xx
+          git clone "$TARGET_URL" --depth=1 drivers/net/wireless/realtek/rtl88xx
           
           # 2. Wire the driver into the compilation maps
           echo 'source "drivers/net/wireless/realtek/rtl88xx/Kconfig"' >> drivers/net/wireless/Kconfig
           echo 'obj-$(CONFIG_RTL88XXAU) += realtek/rtl88xx/' >> drivers/net/wireless/Makefile
           
-          # 3. Add ALL necessary Wi-Fi & USB host power settings to the defconfig target file
-          echo "CONFIG_WIRELESS=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_CFG80211=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_MAC80211=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_CFG80211_WEXT=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_MAC80211_RC_MINSTREL_HT=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_USB_SUPPORT=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_USB_OTG=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_USB_NET_DRIVERS=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_RTL88XXAU=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_WIRELESS_EXT=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_WEXT_CORE=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_FW_LOADER=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_FIRMWARE_IN_KERNEL=y" >> arch/arm64/configs/surya_defconfig
-          echo "CONFIG_EXTRA_FIRMWARE=\"\"" >> arch/arm64/configs/surya_defconfig
+          # 3. Find the config file path dynamically and save it to global GitHub environment memory
+          TARGET_CONFIG=$(find arch/arm64/configs/ -name "*defconfig" | head -n 1)
+          CONFIG_NAME=$(basename "$TARGET_CONFIG")
+          
+          # Export to $GITHUB_ENV so subsequent workflow steps can read the variable
+          echo "TARGET_CONFIG_NAME=$CONFIG_NAME" >> $GITHUB_ENV
+          
+          # 4. Append ALL necessary Wi-Fi & USB host power settings into that discovered target file
+          echo "CONFIG_WIRELESS=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_CFG80211=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_MAC80211=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_CFG80211_WEXT=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_MAC80211_RC_MINSTREL_HT=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_USB_SUPPORT=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_USB_OTG=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_USB_NET_DRIVERS=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_RTL88XXAU=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_WIRELESS_EXT=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_WEXT_CORE=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_FW_LOADER=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_FIRMWARE_IN_KERNEL=y" >> "$TARGET_CONFIG"
+          echo "CONFIG_EXTRA_FIRMWARE=\"\"" >> "$TARGET_CONFIG"
 
       - name: Download AOSP Clang Compiler Toolchain
         run: |
@@ -65,8 +72,8 @@ jobs:
           export SUBARCH=arm64
           export PATH="$GITHUB_WORKSPACE/../aosp-clang/clang-r522817/bin:$PATH"
           
-          # Build target setup
-          make O=out surya_defconfig
+          # Initialize setup using the configuration name saved in global environment memory
+          make O=out "$TARGET_CONFIG_NAME"
           
           # Compile using all available virtual cores
           make -j$(nproc --all) O=out CC=clang CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-gnu-
